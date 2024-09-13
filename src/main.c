@@ -5,6 +5,52 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+
+typedef struct shader_source {
+    char* vertex_shader;
+    char* fragment_shader;
+} shader_source;
+
+typedef enum shader_parse_mode {
+    MODE_VERTEX = 0,
+    MODE_FRAGMENT = 1
+} shader_parse_mode;
+
+//parses the source file into 2 shader sources (vert and frag)
+//TODO: this function feels messsssyyyyy
+shader_source parse_shader(const char* filepath) {
+    FILE* fp = fopen(filepath, "r");
+    char str[1024];
+    shader_parse_mode p_mode = 0;
+
+    char src[2][16384] = {"", ""};
+
+    if(fp != NULL) {
+
+    while(fgets(str,1024,fp)) {
+        printf("Reading line: %s", str);
+        if(strstr(str, "#shader") != NULL) {
+            if(strstr(str, "vertex") != NULL)
+                p_mode = MODE_VERTEX;
+            if(strstr(str, "fragment") != NULL)
+                p_mode = MODE_FRAGMENT;
+        }
+        else {
+            strcat(src[p_mode], str);
+        }
+    }
+
+    }
+    else {
+        printf("file failed to open.\n");
+    }
+
+    shader_source s_src;
+    s_src.vertex_shader   = src[MODE_VERTEX];
+    s_src.fragment_shader = src[MODE_FRAGMENT];
+    return s_src;
+}
 
 //compiles the shader given by src_str.
 //@param 'type' specifies the type of shader to compile
@@ -119,19 +165,32 @@ int main() {
 //GLFW/GLAD initialization stuff ends here
 
 
-    //TODO: glfw can process window resizing and keyboard/mouse input. Look at glfw3.h to see how to do this (or google)
+//TODO: glfw can process window resizing and keyboard/mouse input. Look at glfw3.h to see how to do this (or google)
 
+//TODO: OpenGL error handling   
+
+//TODO: abstract all of the stuff between here and the draw loop into functions or structs or whatever (can't do classes cuz it's not C++ lolllll)
 
 //vertex data
     float positions[] = {0.5f, 0.5f,
                         -0.5f, 0.5f,
                         -0.5f,-0.5f};
 
+
 //vertex buffer; create and bind
     unsigned int vbuf;
     glGenBuffers(1, &vbuf);
     glBindBuffer(GL_ARRAY_BUFFER, vbuf);
     glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW);
+
+//TODO: index buffers
+
+//this is needed in modern OpenGL and using core profile. Basically, nothing will draw if you don't have a VAO bound
+    //NOTE: this has to be specified before vertex attributes are specified (see next block of code)
+    //TODO: there's more to this I guess? see cherno's 'vertex arrays in opengl' video
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
 
 //vertex attributes
     //enable attrib that has index '0' (i.e. 'position' attribute)
@@ -142,19 +201,22 @@ int main() {
     //attributes for the currently bound buffer
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 
-//this is needed in modern OpenGL and using core profile. Basically, nothing will draw if you don't have a VAO bound
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-
 //shaders; write, compile, and bind 
-    //shaders
-    const char* vertex_shader   = "#version 330 core\n\nlayout(location = 0) in vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n";
-    const char* fragment_shader = "#version 330 core\n\nlayout(location = 0) out vec4 color;\n\nvoid main()\n{\n    color = vec4(0.3, 1.0, 0.8, 1.0);\n}\n";
+    //TODO: uniforms
+
+    
+    //TODO: hardcoded string shaders... delete
+    //const char* vertex_shader   = "#version 330 core\n\nlayout(location = 0) in vec4 position;\n\nvoid main()\n{\n    gl_Position = position;\n}\n";
+    //const char* fragment_shader = "#version 330 core\n\nlayout(location = 0) out vec4 color;\n\nvoid main()\n{\n    color = vec4(1.0, 0.0, 1.0, 1.0);\n}\n";
 
     //create the shader program
-    unsigned int shader = create_shader(vertex_shader, fragment_shader);
+    shader_source sources = parse_shader("C:/dev/opengl_c/res/shaders/basic.shader");
+    printf("vertex:\n%s", sources.vertex_shader);
+    printf("fragment:\n%s", sources.fragment_shader);
+
+    unsigned int shader = create_shader(sources.vertex_shader, sources.fragment_shader);
     glUseProgram(shader);
+
 
 //draw loop
 	/* loop until the user closes the window */
@@ -163,7 +225,7 @@ int main() {
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        //TODO: draw buffer/array using shader
+        //draw triangle
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		/* Swap front and back buffers */
@@ -172,6 +234,8 @@ int main() {
 		/* Poll for and process events */
 		glfwPollEvents();
 	}
+
+    glDeleteProgram(shader);
 
 //end fw context
 	glfwTerminate();
